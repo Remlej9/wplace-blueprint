@@ -77,6 +77,15 @@ export default function ImageUpload() {
               className="w-full h-full object-contain rounded-sm border border-gray-300 dark:border-gray-600 aspect-square"
           />
       }
+
+    {preview &&
+        <div
+            onClick={handleClick}
+            className="flex flex-col items-center align-center text-sm text-gray-500 dark:text-gray-400 cursor-pointer bg-gray-100 dark:bg-gray-700 p-2 rounded-lg hover:bg-gray-200 hover:dark:bg-gray-600 transition"
+        >
+            Upload another image
+        </div>
+    }
     </div>
   )
 }
