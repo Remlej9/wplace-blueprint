@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ImageEditorProps = {
   src: string;
@@ -8,21 +8,69 @@ type ImageEditorProps = {
 };
 
 export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorProps) {
-  const [ scale, setScale ] = useState(128); 
-  const [ custom, setCustom ] = useState(false); 
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const [ size, setSize ] = useState(128); 
+  const [ custom, setCustom ] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !src) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const image = new Image();
+
+    image.src = src;
+
+    image.onload = () => {
+      // Set canvas size
+      canvas.width = size;
+      canvas.height = size;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Nearest neighbor scaling
+      ctx.imageSmoothingEnabled = false;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+
+      const scale = Math.min(
+        canvas.width / image.width,
+        canvas.height / image.height
+      );
+
+      const drawWidth = image.width * scale;
+      const drawHeight = image.height * scale;
+
+      // Draw the image scaled to fit the canvas
+      ctx.drawImage(
+        image,
+        -drawWidth / 2,
+        -drawHeight / 2,
+        drawWidth,
+        drawHeight
+      );
+
+      ctx.restore();
+      };
+    }, [src, size]);
 
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Preview area */}
       <div className="relative w-full aspect-square rounded-2xl border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-contain transition-transform duration-150 ease-out"
+        <canvas
+          ref={canvasRef}
+          aria-label={alt}
+          className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
         />
         {/* Canvas size display in bottom-right corner of image */}
         <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-lg">
-          {scale} x {scale}
+          {size} x {size} ({size * size} px)
         </div>
       </div>
 
@@ -37,14 +85,14 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
         {/* Scale presets dropdown menu */}
         <div className="mb-4">
           <select
-            value={custom ? "custom" : scale.toString()}
+            value={custom ? "custom" : size.toString()}
             onChange={(e) => {
               const value = e.target.value;
               if (value === "custom") {
                 setCustom(true);
               } else {
                 setCustom(false);
-                setScale(Number(value));
+                setSize(Number(value));
               }
             }}
             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
@@ -59,15 +107,15 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
         </div>
 
 
-        {/* Custom scale */}
+        {/* Custom size */}
         {custom && (
         <ControlRow
           label="Size"
-          value={scale}
-          min={50}
-          max={200}
+          value={size}
+          min={1}
+          max={2048}
           step={1}
-          onChange={setScale}
+          onChange={setSize}
         />)}
       </div>
     </div>
