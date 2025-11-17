@@ -12,6 +12,100 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
 
   const [ size, setSize ] = useState(128); 
   const [ custom, setCustom ] = useState(false);
+  const [ freeMode, setFreeMode ] = useState(false);
+
+  const freeColorsHex = [
+    "#000000", // Black
+    "#3c3c3c", // Dark Gray
+    "#787878", // Gray
+    "#d2d2d2", // Light Gray
+    "#ffffff", // White
+    "#600018", // Deep Red
+    "#ed1c24", // Red
+    "#ff7f27", // Orange
+    "#f6aa09", // Gold
+    "#f9dd3b", // Yellow
+    "#fffabc", // Light Yellow
+    "#0eb968", // Dark Green
+    "#13e67b", // Green
+    "#87ff5e", // Light Green
+    "#0c816e", // Dark Teal
+    "#10aea6", // Teal
+    "#13e1bc", // Light Teal
+    "#60f7f2", // Cyan
+    "#28509e", // Dark Blue
+    "#4093e4", // Blue
+    "#6b50f6", // Indigo
+    "#99b1fb", // Light Indigo
+    "#780c99", // Dark Purple
+    "#aa38b9", // Purple
+    "#e09ff9", // Light Purple
+    "#cb007a", // Dark Pink
+    "#ec1f80", // Pink
+    "#f38da9", // Light Pink
+    "#684634", // Dark Brown
+    "#95682a", // Brown
+    "#f8b277", // Beige
+  ];
+
+  // convert hex colors to rgb
+  const freeColors = freeColorsHex.map(color => {
+    if (typeof color === "string") {
+      const bigint = parseInt(color.slice(1), 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return [r, g, b];
+    }
+    return color;
+  });
+
+  const premiumColorsHex = [
+    "#aaaaaa", // Medium Gray
+    "#a50e1e", // Dark Red
+    "#fa8072", // Light Red
+    "#e45c1a", // Dark Orange
+    "#9c8431", // Dark Goldenrod
+    "#c5ad31", // Goldenrod
+    "#e8d45f", // Light Goldenrod
+    "#4a6b3a", // Dark Olive
+    "#5a944a", // Olive
+    "#84c573", // Light Olive
+    "#0f799f", // Dark Cyan
+    "#bbfaf2", // Light Cyan
+    "#7dc7ff", // Light Blue
+    "#4d31b8", // Dark Indigo
+    "#4a4284", // Dark Slate Blue
+    "#7a71c4", // Slate Blue
+    "#b5aef1", // Light Slate Blue
+    "#9b5249", // Dark Peach
+    "#d18078", // Peach
+    "#fab6a4", // Light Peach
+    "#dba463", // Light Brown
+    "#7b6352", // Dark Tan
+    "#9c846b", // Tan
+    "#d6b594", // Light Tan
+    "#d18051", // Dark Biege
+    "#ffc5a5", // Light Biege
+    "#6d643f", // Dark Stone
+    "#948c6b", // Stone
+    "#cdc59e", // Light Stone
+    "#333941", // Dark Slate
+    "#6d758d", // Slate
+    "#b3b9d1", // Light Slate
+  ];
+
+  // convert hex colors to rgb
+  const premiumColors = premiumColorsHex.map(color => {
+    if (typeof color === "string") {
+      const bigint = parseInt(color.slice(1), 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return [r, g, b];
+    }
+    return color;
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,22 +123,19 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
       canvas.width = size;
       canvas.height = size;
 
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       // Nearest neighbor scaling
       ctx.imageSmoothingEnabled = false;
 
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
 
-      const scale = Math.min(
+      const fitScale = Math.min(
         canvas.width / image.width,
         canvas.height / image.height
       );
 
-      const drawWidth = image.width * scale;
-      const drawHeight = image.height * scale;
+      const drawWidth = image.width * fitScale;
+      const drawHeight = image.height * fitScale;
 
       // Draw the image scaled to fit the canvas
       ctx.drawImage(
@@ -56,6 +147,48 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
       );
 
       ctx.restore();
+
+      // Map pixels to available colors
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        // Get original colors
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+
+        if (a === 0) {
+          // Transparent pixel, skip
+          continue;
+        }
+
+        // Find the nearest color from free and premium palettes if not in free mode
+        const palette = freeMode ? freeColors : freeColors.concat(premiumColors);
+        let nearestColor = palette[0];
+        let minDistance = Infinity;
+        for (const color of palette) {
+          const dr = r - color[0];
+          const dg = g - color[1];
+          const db = b - color[2];
+          const distance = dr * dr + dg * dg + db * db;
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestColor = color;
+          }
+        }
+
+        // Set pixel to nearest color
+        data[i] = nearestColor[0];
+        data[i + 1] = nearestColor[1];
+        data[i + 2] = nearestColor[2];
+        data[i + 3] = a; // Preserve alpha
+
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
       };
     }, [src, size]);
 
