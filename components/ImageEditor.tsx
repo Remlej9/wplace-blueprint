@@ -1,6 +1,11 @@
+// ImageEditor.tsx
+
+// TODO: Custom color selection, more editing tools
+
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { PALETTE, hexToRgb } from "@/lib/palette";
 
 type ImageEditorProps = {
   src: string;
@@ -13,99 +18,19 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
   const [ size, setSize ] = useState(128); 
   const [ custom, setCustom ] = useState(false);
   const [ freeMode, setFreeMode ] = useState(false);
+  const [ transparentPixels, setTransparentPixels ] = useState(0);
 
-  const freeColorsHex = [
-    "#000000", // Black
-    "#3c3c3c", // Dark Gray
-    "#787878", // Gray
-    "#d2d2d2", // Light Gray
-    "#ffffff", // White
-    "#600018", // Deep Red
-    "#ed1c24", // Red
-    "#ff7f27", // Orange
-    "#f6aa09", // Gold
-    "#f9dd3b", // Yellow
-    "#fffabc", // Light Yellow
-    "#0eb968", // Dark Green
-    "#13e67b", // Green
-    "#87ff5e", // Light Green
-    "#0c816e", // Dark Teal
-    "#10aea6", // Teal
-    "#13e1bc", // Light Teal
-    "#60f7f2", // Cyan
-    "#28509e", // Dark Blue
-    "#4093e4", // Blue
-    "#6b50f6", // Indigo
-    "#99b1fb", // Light Indigo
-    "#780c99", // Dark Purple
-    "#aa38b9", // Purple
-    "#e09ff9", // Light Purple
-    "#cb007a", // Dark Pink
-    "#ec1f80", // Pink
-    "#f38da9", // Light Pink
-    "#684634", // Dark Brown
-    "#95682a", // Brown
-    "#f8b277", // Beige
-  ];
-
-  // convert hex colors to rgb
-  const freeColors = freeColorsHex.map(color => {
-    if (typeof color === "string") {
-      const bigint = parseInt(color.slice(1), 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      return [r, g, b];
-    }
-    return color;
-  });
-
-  const premiumColorsHex = [
-    "#aaaaaa", // Medium Gray
-    "#a50e1e", // Dark Red
-    "#fa8072", // Light Red
-    "#e45c1a", // Dark Orange
-    "#9c8431", // Dark Goldenrod
-    "#c5ad31", // Goldenrod
-    "#e8d45f", // Light Goldenrod
-    "#4a6b3a", // Dark Olive
-    "#5a944a", // Olive
-    "#84c573", // Light Olive
-    "#0f799f", // Dark Cyan
-    "#bbfaf2", // Light Cyan
-    "#7dc7ff", // Light Blue
-    "#4d31b8", // Dark Indigo
-    "#4a4284", // Dark Slate Blue
-    "#7a71c4", // Slate Blue
-    "#b5aef1", // Light Slate Blue
-    "#9b5249", // Dark Peach
-    "#d18078", // Peach
-    "#fab6a4", // Light Peach
-    "#dba463", // Light Brown
-    "#7b6352", // Dark Tan
-    "#9c846b", // Tan
-    "#d6b594", // Light Tan
-    "#d18051", // Dark Biege
-    "#ffc5a5", // Light Biege
-    "#6d643f", // Dark Stone
-    "#948c6b", // Stone
-    "#cdc59e", // Light Stone
-    "#333941", // Dark Slate
-    "#6d758d", // Slate
-    "#b3b9d1", // Light Slate
-  ];
-
-  // convert hex colors to rgb
-  const premiumColors = premiumColorsHex.map(color => {
-    if (typeof color === "string") {
-      const bigint = parseInt(color.slice(1), 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      return [r, g, b];
-    }
-    return color;
-  });
+  // Prepare color palettes
+  const activePalette = useMemo(
+    () =>
+      (freeMode ? 
+        PALETTE.filter((color) => color.tier === "free") : 
+        PALETTE
+      ).map((color) => ({
+        ...color,
+        rgb: hexToRgb(color.hex),
+      })),
+    [freeMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -119,6 +44,13 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
     image.src = src;
 
     image.onload = () => {
+
+      if (size <= 0) {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
       // Set canvas size
       canvas.width = size;
       canvas.height = size;
@@ -152,59 +84,84 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
+      let transparentCount = 0;
+
       for (let i = 0; i < data.length; i += 4) {
-        // Get original colors
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         const a = data[i + 3];
 
-        if (a === 0) {
-          // Transparent pixel, skip
+        if (a <= 0.1) {
+          transparentCount++;
           continue;
         }
 
-        // Find the nearest color from free and premium palettes if not in free mode
-        const palette = freeMode ? freeColors : freeColors.concat(premiumColors);
-        let nearestColor = palette[0];
+        let nearest = activePalette[0];
         let minDistance = Infinity;
-        for (const color of palette) {
-          const dr = r - color[0];
-          const dg = g - color[1];
-          const db = b - color[2];
+
+        for (const color of activePalette) {
+          const [cr, cg, cb] = color.rgb;
+          const dr = r - cr;
+          const dg = g - cg;
+          const db = b - cb;
           const distance = dr * dr + dg * dg + db * db;
           if (distance < minDistance) {
             minDistance = distance;
-            nearestColor = color;
+            nearest = color;
           }
         }
 
-        // Set pixel to nearest color
-        data[i] = nearestColor[0];
-        data[i + 1] = nearestColor[1];
-        data[i + 2] = nearestColor[2];
-        data[i + 3] = a; // Preserve alpha
-
+        const [nr, ng, nb] = nearest.rgb;
+        data[i] = nr;
+        data[i + 1] = ng;
+        data[i + 2] = nb;
+        data[i + 3] = 255;
       }
+
+      setTransparentPixels(transparentCount);
 
       ctx.putImageData(imageData, 0, 0);
 
       };
-    }, [src, size]);
+    }, [src, size, freeMode]);
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const link = document.createElement("a");
+    link.download = "edited-image.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex flex-col gap-4 w-full flex">
       {/* Preview area */}
-      <div className="relative w-full aspect-square rounded-2xl border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="relative w-full aspect-square border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <canvas
           ref={canvasRef}
           aria-label={alt}
           className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
         />
         {/* Canvas size display in bottom-right corner of image */}
-        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-lg">
+        <div className="absolute bottom-2 right-2 bg-black/50 bg-opacity-0 text-white text-xs px-2 py-1 rounded-lg">
           {size} x {size} ({size * size} px)
         </div>
+
+
+        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
+          {(size * size - transparentPixels) >= 0 ? size * size - transparentPixels : 0} pixels to paint
+        </div>
+
+        <button
+          onClick={handleDownload}
+          className="absolute top-2 right-2 bg-white dark:bg-blue-600/50 hover:bg-opacity-100 text-gray-800 dark:text-gray-100 text-xs px-3 py-1 rounded-lg transition"
+        >
+          Download PNG
+        </button>
+
       </div>
 
       {/* Grid Size */}
@@ -245,11 +202,32 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
         <ControlRow
           label="Size"
           value={size}
-          min={1}
-          max={2048}
+          min={0}
+          max={1048}
           step={1}
           onChange={setSize}
         />)}
+
+        {/* Free mode toggle */}
+        <div className="flex items-center space-x-3 mt-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={freeMode}
+            onClick={() => setFreeMode(!freeMode)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition
+              ${freeMode ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition
+                ${freeMode ? "translate-x-5" : "translate-x-1"}`}
+            />
+          </button>
+
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Free Mode (Use Free Colors Only)
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -271,8 +249,18 @@ function ControlRow({ label, value, min, max, step = 1, onChange }: ControlRowPr
       <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
         <span>{label}</span>
         <span className="tabular-nums">
-          {value}
-          <span className="ml-0.5">x</span>
+          <input type="text" value={value}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (!isNaN(val)) {
+                if (val >= min && val <= max) {
+                  onChange(val);
+                }
+              }
+            }}
+            className="w-16 p-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 text-right"
+          />
+          <span className="ml-0.5 mr-0.5">x</span>
           {value}
         </span>
       </div>
