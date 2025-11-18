@@ -13,6 +13,12 @@ type ImageEditorProps = {
   onUploadClick: () => void;
 };
 
+type usedColor = {
+  hex: string;
+  name?: string;
+  count: number;
+};
+
 export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -20,6 +26,8 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ custom, setCustom ] = useState(false);
   const [ freeMode, setFreeMode ] = useState(false);
   const [ transparentPixels, setTransparentPixels ] = useState(0);
+  const [ usedColorsData, setUsedColorsData ] = useState<usedColor[]>([]);
+  const [ minimumPixels, setMinimumPixels ] = useState(0);
 
   // Prepare color palettes
   const activePalette = useMemo(
@@ -49,6 +57,8 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       if (size <= 0) {
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        setUsedColorsData([]);
+        setTransparentPixels(0);
         return;
       }
 
@@ -86,6 +96,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       const data = imageData.data;
 
       let transparentCount = 0;
+      const colorCounts = new Map<string, { name: string; count: number }>();
 
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
@@ -118,14 +129,28 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
         data[i + 1] = ng;
         data[i + 2] = nb;
         data[i + 3] = 255;
+
+        const hex = nearest.hex;
+
+        const currentData = colorCounts.get(hex);
+        if (currentData) {
+          currentData.count += 1;
+        } else {
+          colorCounts.set(hex, { name: nearest.name, count: 1 });
+        }
       }
 
+      const sortedUsedColors: UsedColor[] = Array.from(colorCounts.entries())
+        .map(([hex, { name, count }]) => ({ hex, name, count }))
+        .sort((a, b) => b.count - a.count);
+
+      setUsedColorsData(sortedUsedColors);
       setTransparentPixels(transparentCount);
 
       ctx.putImageData(imageData, 0, 0);
 
       };
-    }, [src, size, freeMode]);
+    }, [src, size, freeMode, activePalette, minimumPixels]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -239,6 +264,67 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
           <span className="text-sm text-gray-700 dark:text-gray-300">
             Free Mode (Use Free Colors Only)
           </span>
+        </div>
+
+        {/* Color display */}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
+            Available Colors ({activePalette.length})
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            Disable colors manually by clicking on them (TODO)
+          </p>
+          <div className="flex gap-1 items-center max-h-48 overflow-y-auto p-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
+            {activePalette.map((color) => (
+              <div
+                key={color.hex}
+                className="aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
+                style={{ backgroundColor: color.hex }}
+                title={color.name}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Used colors display */}
+        <div className="mt-4">
+          <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
+            Colors in image ({usedColorsData.length})
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            Sorted by pixel count
+          </p>
+          <div className="flex gap-1 items-center max-h-48 overflow-y-auto p-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
+            {usedColorsData.map((data) => (
+              <div
+                key={data.hex}
+                className="aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
+                style={{ backgroundColor: data.hex }}
+                title={`${data.name} (${data.count} pixels)`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Remove colors with less than x pixels - TODO */}
+        <div className="mt-4">
+          <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
+            <span>Remove colors with less than</span>
+            <span className="tabular-nums">
+              {minimumPixels} pixels
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={10000}
+            step={1}
+            value={minimumPixels}
+            onChange={(e) => setMinimumPixels(Number(e.target.value))}
+            className="w-full accent-blue-500"
+          />
+          </div>
         </div>
       </div>
     </div>
