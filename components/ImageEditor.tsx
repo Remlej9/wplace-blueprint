@@ -10,9 +10,10 @@ import { PALETTE, hexToRgb } from "@/lib/palette";
 type ImageEditorProps = {
   src: string;
   alt?: string;
+  onUploadClick: () => void;
 };
 
-export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorProps) {
+export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [ size, setSize ] = useState(128); 
@@ -137,35 +138,46 @@ export default function ImageEditor({ src, alt = "Edited Image" }: ImageEditorPr
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full flex">
+    <div className="flex flex-col md:flex-row gap-6 w-full">
       {/* Preview area */}
-      <div className="relative w-full aspect-square border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <canvas
-          ref={canvasRef}
-          aria-label={alt}
-          className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
-        />
-        {/* Canvas size display in bottom-right corner of image */}
-        <div className="absolute bottom-2 right-2 bg-black/50 bg-opacity-0 text-white text-xs px-2 py-1 rounded-lg">
-          {size} x {size} ({size * size} px)
+      <div className="flex flex-col gap-3 w-full md:w-1/2">
+        <div className="relative w-full aspect-square border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            aria-label={alt}
+            className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
+          />
+          {/* Canvas size display in bottom-right corner of image */}
+          <div className="absolute bottom-2 right-2 bg-black/50 bg-opacity-0 text-white text-xs px-2 py-1 rounded-lg">
+            {size} x {size} ({size * size} px)
+          </div>
+
+
+          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
+            {(size * size - transparentPixels) >= 0 ? size * size - transparentPixels : 0} pixels to paint
+          </div>
+
+          <button
+            onClick={handleDownload}
+            className="absolute top-2 right-2 bg-white dark:bg-blue-600/50 hover:bg-opacity-100 text-gray-800 dark:text-gray-100 text-xs px-3 py-1 rounded-lg transition"
+          >
+            Download PNG
+          </button>
+
         </div>
 
-
-        <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
-          {(size * size - transparentPixels) >= 0 ? size * size - transparentPixels : 0} pixels to paint
-        </div>
-
+        {/* Upload another image */}
         <button
-          onClick={handleDownload}
-          className="absolute top-2 right-2 bg-white dark:bg-blue-600/50 hover:bg-opacity-100 text-gray-800 dark:text-gray-100 text-xs px-3 py-1 rounded-lg transition"
+          type="button"
+          onClick={onUploadClick}
+          className="w-full text-sm text-gray-500 dark:text-gray-200 cursor-pointer bg-gray-100 dark:bg-gray-700 p-2 rounded-lg hover:bg-gray-200 hover:dark:bg-gray-600 transition"
         >
-          Download PNG
+          Upload Another Image
         </button>
-
       </div>
 
       {/* Grid Size */}
-      <div className="space-y-3 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+      <div className="w-full md:w-1/2 space-y-3 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-medium text-gray-800 dark:text-gray-100">
             Canvas Size

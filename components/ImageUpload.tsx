@@ -49,7 +49,7 @@ export default function ImageUpload() {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-md mx-auto">
+    <div className="flex flex-col items-center gap-4 w-full max-w-5xl mx-auto">
       { /* Image upload input is hidden */ }
       <input
           type="file" accept="image/*" className="hidden"
@@ -64,7 +64,7 @@ export default function ImageUpload() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`w-full h-48 outline-2 outline-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition 
+              className={`w-1/2 h-48 outline-2 outline-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition 
             ${isDragging ? "outline-blue-400 bg-blue-50 dark:bg-gray-700" : "hover:outline-blue-400 hover:bg-blue-50 hover:dark:bg-gray-700"}
           `}>
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -73,16 +73,7 @@ export default function ImageUpload() {
           </div>
       }
 
-      {preview && <ImageEditor src={preview} alt="Preview" />}
-
-      {preview &&
-        <div
-            onClick={handleClick}
-            className="flex flex-col items-center align-center text-sm text-gray-500 dark:text-gray-400 cursor-pointer bg-gray-100 dark:bg-gray-700 p-2 rounded-lg hover:bg-gray-200 hover:dark:bg-gray-600 transition"
-        >
-            Upload another image
-        </div>
-    }
+      {preview && <ImageEditor src={preview} alt="Preview" onUploadClick={handleClick} />}
     </div>
   )
 }
