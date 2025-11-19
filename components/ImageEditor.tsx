@@ -147,10 +147,6 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       setUsedColorsData(sortedUsedColors);
       setTransparentPixels(transparentCount);
 
-      if (colorLimit === 0 || colorLimit > sortedUsedColors.length) {
-        setColorLimit(sortedUsedColors.length);
-      }
-
       const initialImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       let finalImageData = initialImageData;
@@ -233,6 +229,15 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
 
       };
     }, [src, size, freeMode, activePalette, colorLimit]);
+
+  useEffect(() => {
+    const newMaxColors = usedColorsData.length;
+
+    if (colorLimit === 0 || colorLimit !== newMaxColors) {
+      setColorLimit(newMaxColors)
+    }
+
+  }, [ usedColorsData.length, setColorLimit ]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
