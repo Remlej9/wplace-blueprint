@@ -27,7 +27,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ freeMode, setFreeMode ] = useState(false);
   const [ transparentPixels, setTransparentPixels ] = useState(0);
   const [ usedColorsData, setUsedColorsData ] = useState<usedColor[]>([]);
-  const [ minimumPixels, setMinimumPixels ] = useState(0);
+  const [ colorLimit, setColorLimit ] = useState(0);
 
   // Prepare color palettes
   const activePalette = useMemo(
@@ -147,10 +147,92 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       setUsedColorsData(sortedUsedColors);
       setTransparentPixels(transparentCount);
 
-      ctx.putImageData(imageData, 0, 0);
+      if (colorLimit === 0 || colorLimit > sortedUsedColors.length) {
+        setColorLimit(sortedUsedColors.length);
+      }
+
+      const initialImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      let finalImageData = initialImageData;
+
+      // Only re-quantize if a reduction limit > 0 is set AND the limit is less than the total used colors.
+      if (colorLimit > 0 && colorLimit < sortedUsedColors.length) {
+          
+          // 1. Determine the reduced palette: the top N most frequent colors
+          const reducedPaletteData = sortedUsedColors.slice(0, colorLimit);
+          const reducedPalette = new Map<string, [number, number, number]>();
+
+          // Convert reduced HEX colors to RGB for faster comparison
+          reducedPaletteData.forEach(color => {
+              const [r, g, b] = hexToRgb(color.hex); // Assuming hexToRgb utility is available
+              reducedPalette.set(color.hex, [r, g, b]);
+          });
+          
+          // Get the RGB of the color you will use for *all* colors outside the limit
+          // The closest color is often the most frequent one (index 0)
+          const fallbackColorHex = reducedPaletteData[0].hex;
+          const [fr, fg, fb] = hexToRgb(fallbackColorHex);
+          
+          // 2. Process the image data again
+          finalImageData = initialImageData;
+          const finalData = finalImageData.data;
+          
+          // Map used HEX codes to their presence in the reduced palette
+          const isReducedColor = new Set(reducedPaletteData.map(c => c.hex));
+
+          // Loop through the *already* paletted image data
+          for (let i = 0; i < finalData.length; i += 4) {
+              // Skip transparent pixels (alpha 0)
+              if (finalData[i + 3] === 0) {
+                  continue;
+              }
+              
+              const r = finalData[i];
+              const g = finalData[i + 1];
+              const b = finalData[i + 2];
+
+              // Convert the current RGB back to HEX (this requires a helper or
+              // you can skip converting to HEX and just check if the color is
+              // one of the reducedPaletteData's RGBs)
+              
+              // Simplification: since the image is ALREADY paletted, we can map *all*
+              // colors not in the reduced set to the fallback color.
+              
+              // We need a map from the full paletted colors (from activePalette) to
+              // their hex codes to see if they're in the reduced set.
+              // A much simpler approach is to re-quantize to the *reduced* palette:
+              
+              let nearest = { hex: fallbackColorHex, rgb: [fr, fg, fb] };
+              let minDistance = Infinity;
+
+              // Iterate over the much smaller *reduced* palette (top N)
+              for (const hex of reducedPalette.keys()) {
+                  const [cr, cg, cb] = reducedPalette.get(hex)!;
+                  const dr = r - cr;
+                  const dg = g - cg;
+                  const db = b - cb;
+                  const distance = dr * dr + dg * dg + db * db;
+                  
+                  if (distance < minDistance) {
+                      minDistance = distance;
+                      nearest = { hex, rgb: [cr, cg, cb] };
+                  }
+              }
+              
+              const [nr, ng, nb] = nearest.rgb;
+              finalData[i] = nr;
+              finalData[i + 1] = ng;
+              finalData[i + 2] = nb;
+              finalData[i + 3] = 255;
+          }
+      }
+
+      // --- END: Color Reduction Logic ---
+
+      ctx.putImageData(finalImageData, 0, 0);
 
       };
-    }, [src, size, freeMode, activePalette, minimumPixels]);
+    }, [src, size, freeMode, activePalette, colorLimit]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -289,13 +371,13 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
         {/* Used colors display */}
         <div className="mt-4">
           <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
-            Colors in image ({usedColorsData.length})
+            Colors in image ({colorLimit > 0 ? colorLimit : usedColorsData.length})
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             Sorted by pixel count
           </p>
           <div className="flex gap-1 items-center max-h-48 overflow-y-auto p-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
-            {usedColorsData.map((data) => (
+            {(colorLimit > 0 ? usedColorsData.slice(0, colorLimit) : usedColorsData).map((data) => (
               <div
                 key={data.hex}
                 className="aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
@@ -306,22 +388,22 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
           </div>
         </div>
 
-        {/* Remove colors with less than x pixels - TODO */}
+        {/* Image color reductiob */}
         <div className="mt-4">
           <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-300">
-            <span>Remove colors with less than</span>
+            <span>Reduce colors</span>
             <span className="tabular-nums">
-              {minimumPixels} pixels
+             {colorLimit} / {usedColorsData.length} colors
             </span>
           </div>
           <input
             type="range"
-            min={0}
-            max={10000}
+            min={usedColorsData.length > 0 ? 1 : 0}
+            max={usedColorsData.length}
             step={1}
-            value={minimumPixels}
-            onChange={(e) => setMinimumPixels(Number(e.target.value))}
+            value={colorLimit}
+            onChange={(e) => setColorLimit(Number(e.target.value))}
             className="w-full accent-blue-500"
           />
           </div>
