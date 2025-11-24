@@ -147,9 +147,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       setUsedColorsData(sortedUsedColors);
       setTransparentPixels(transparentCount);
 
-      const initialImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      let finalImageData = initialImageData;
+      let finalImageData = imageData;
 
       // Only re-quantize if a reduction limit > 0 is set AND the limit is less than the total used colors.
       if (colorLimit > 0 && colorLimit < sortedUsedColors.length) {
@@ -170,7 +168,6 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
           const [fr, fg, fb] = hexToRgb(fallbackColorHex);
           
           // 2. Process the image data again
-          finalImageData = initialImageData;
           const finalData = finalImageData.data;
           
           // Map used HEX codes to their presence in the reduced palette
@@ -186,17 +183,6 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
               const r = finalData[i];
               const g = finalData[i + 1];
               const b = finalData[i + 2];
-
-              // Convert the current RGB back to HEX (this requires a helper or
-              // you can skip converting to HEX and just check if the color is
-              // one of the reducedPaletteData's RGBs)
-              
-              // Simplification: since the image is ALREADY paletted, we can map *all*
-              // colors not in the reduced set to the fallback color.
-              
-              // We need a map from the full paletted colors (from activePalette) to
-              // their hex codes to see if they're in the reduced set.
-              // A much simpler approach is to re-quantize to the *reduced* palette:
               
               let nearest = { hex: fallbackColorHex, rgb: [fr, fg, fb] };
               let minDistance = Infinity;
