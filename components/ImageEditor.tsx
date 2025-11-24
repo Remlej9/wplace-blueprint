@@ -21,6 +21,7 @@ type usedColor = {
 
 export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [ size, setSize ] = useState(128); 
   const [ custom, setCustom ] = useState(false);
@@ -28,6 +29,8 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ transparentPixels, setTransparentPixels ] = useState(0);
   const [ usedColorsData, setUsedColorsData ] = useState<usedColor[]>([]);
   const [ colorLimit, setColorLimit ] = useState(0);
+  const [ showGrid, setShowGrid ] = useState(true);
+  const [ hoverPixel, setHoverPixel ] = useState<{ x: number; y: number } | null>(null);
 
   // Prepare color palettes
   const activePalette = useMemo(
@@ -225,6 +228,64 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
 
   }, [ usedColorsData.length, setColorLimit ]);
 
+  {/* useEffect for grid canvas */}
+  useEffect(() => {
+    const gridCanvas = gridCanvasRef.current;
+    const baseCanvas = canvasRef.current;
+    if (!gridCanvas || !baseCanvas) return;
+
+    const rect = baseCanvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const dpr = window.devicePixelRatio || 1;
+
+    // Match the on-screen size in device pixels
+    gridCanvas.width = rect.width * dpr;
+    gridCanvas.height = rect.height * dpr;
+
+    const ctx = gridCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // Clear previous grid
+    ctx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+    if (!showGrid || size <= 0 || size > 128) return;
+
+    ctx.save();
+
+    // Draw at device pixel ratio
+    ctx.scale(dpr, dpr);
+
+    // Draw crisp 1px grid aligned to pixel boundaries
+    ctx.strokeStyle = "rgba(0, 0, 0, 1)";
+    ctx.lineWidth = 0.2;
+
+    const cellWidth = rect.width / size;
+    const cellHeight = rect.height / size;
+
+    ctx.beginPath();
+
+    // Vertical lines
+    for (let i = 0; i <= size; i++) {
+      const x = i * cellWidth - 0.5; // Align to pixel boundary
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, rect.height);
+    }
+
+    // Horizontal lines
+    for (let i = 0; i <= size; i++) {
+      const y = i * cellHeight - 0.5; // Align to pixel boundary
+      ctx.moveTo(0, y);
+      ctx.lineTo(rect.width, y);
+    }
+
+    console.log(dpr)
+
+    ctx.stroke();
+
+    ctx.restore();
+  }, [size, showGrid, hoverPixel]);
+
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -245,6 +306,14 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
             aria-label={alt}
             className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
           />
+
+          {/* Grid Overlay */}
+          <canvas
+            ref={gridCanvasRef}
+            className="pointer-events-none absolute inset-0 w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
+          />
+
+
           {/* Canvas size display in bottom-right corner of image */}
           <div className="absolute bottom-2 right-2 bg-black/50 bg-opacity-0 text-white text-xs px-2 py-1 rounded-lg">
             {size} x {size} ({size * size} px)
@@ -317,6 +386,27 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
           step={1}
           onChange={setSize}
         />)}
+
+        {/* Grid Toggle */}
+        <div className="flex items-center space-x-3 mt-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showGrid}
+            onClick={() => setShowGrid(!showGrid)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition
+              ${showGrid ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition
+                ${showGrid ? "translate-x-5" : "translate-x-1"}`}
+            />
+          </button>
+
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            Show Pixel Grid (For canvas sizes ≤ 128x128)
+          </span>
+        </div>
 
         {/* Free mode toggle */}
         <div className="flex items-center space-x-3 mt-2">
