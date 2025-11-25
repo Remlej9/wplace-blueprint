@@ -43,6 +43,11 @@ export default function ImageUpload() {
   // Handle the selected file, e.g., generate a preview URL
   const handleFile = (file: File) => {
       if (!file.type.startsWith("image/")) return;
+
+      if (preview) {
+          URL.revokeObjectURL(preview);
+      }
+
       const url = URL.createObjectURL(file);
       setPreview(url);
       console.log("Selected file:", file);
@@ -73,7 +78,13 @@ export default function ImageUpload() {
           </div>
       }
 
-      {preview && <ImageEditor src={preview} alt="Preview" onUploadClick={handleClick} />}
+      {preview && 
+      <ImageEditor 
+        src={preview} 
+        alt="Preview" 
+        onUploadClick={handleClick} 
+        onFileDrop={handleFile}
+      />}
     </div>
   )
 }

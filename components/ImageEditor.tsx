@@ -11,6 +11,7 @@ type ImageEditorProps = {
   src: string;
   alt?: string;
   onUploadClick: () => void;
+  onFileDrop?: (file: File) => void;
 };
 
 type UsedColor = {
@@ -32,7 +33,7 @@ type HoverInfo = {
     name?: string;
 };
 
-export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }: ImageEditorProps) {
+export default function ImageEditor({ src, alt = "Edited Image", onUploadClick, onFileDrop }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -45,6 +46,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ showGrid, setShowGrid ] = useState(true);
   const [ hoverPixel, setHoverPixel ] = useState<{ x: number; y: number } | null>(null);
   const [ hoverInfo, setHoverInfo ] = useState<HoverInfo | null>(null);
+  const [ isDraggingOverCanvas, setIsDraggingOverCanvas ] = useState(false);
 
   // Prepare color palettes
   const activePalette = useMemo(
@@ -312,7 +314,27 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
     <div className="flex flex-col md:flex-row gap-6 w-full">
       {/* Preview area */}
       <div className="flex flex-col gap-3 w-full md:w-1/2">
-        <div className="relative w-full aspect-square border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className={`relative w-full aspect-square border border-gray-300 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-900 flex items-center justify-center transition 
+          ${isDraggingOverCanvas ? "ring-2 ring-blue-400 ring-offset-2" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDraggingOverCanvas(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setIsDraggingOverCanvas(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDraggingOverCanvas(false);
+
+          if (!onFileDrop) return;
+
+          const file = e.dataTransfer.files?.[0];
+          if (file && file.type.startsWith("image/")) {
+            onFileDrop(file);
+          }
+        }}>
           <canvas
             ref={canvasRef}
             aria-label={alt}
