@@ -13,10 +13,22 @@ type ImageEditorProps = {
   onUploadClick: () => void;
 };
 
-type usedColor = {
+type UsedColor = {
   hex: string;
   name?: string;
   count: number;
+};
+
+type HoverInfo = {
+    x: number;
+    y: number;
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+    hex: string;
+    tier?: "free" | "premium";
+    name?: string;
 };
 
 export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }: ImageEditorProps) {
@@ -27,23 +39,10 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ custom, setCustom ] = useState(false);
   const [ freeMode, setFreeMode ] = useState(false);
   const [ transparentPixels, setTransparentPixels ] = useState(0);
-  const [ usedColorsData, setUsedColorsData ] = useState<usedColor[]>([]);
+  const [ usedColorsData, setUsedColorsData ] = useState<UsedColor[]>([]);
   const [ colorLimit, setColorLimit ] = useState(0);
   const [ showGrid, setShowGrid ] = useState(true);
   const [ hoverPixel, setHoverPixel ] = useState<{ x: number; y: number } | null>(null);
-
-  type HoverInfo = {
-    x: number;
-    y: number;
-    r: number;
-    g: number;
-    b: number;
-    a: number;
-    hex: string;
-    tier?: "free" | "premium";
-    name?: string;
-  };
-
   const [ hoverInfo, setHoverInfo ] = useState<HoverInfo | null>(null);
 
   // Prepare color palettes
@@ -113,7 +112,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       const data = imageData.data;
 
       let transparentCount = 0;
-      const colorCounts = new Map<string, { name: string; count: number }>();
+      const colorCounts = new Map<string, { name?: string; count: number }>();
 
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
@@ -293,12 +292,10 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       ctx.lineTo(rect.width, y);
     }
 
-    console.log(dpr)
-
     ctx.stroke();
 
     ctx.restore();
-  }, [size, showGrid, hoverPixel]);
+  }, [size, showGrid]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -336,11 +333,22 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
                 const ctx = canvas.getContext("2d");
                 if (!ctx) return;
 
-                const { data } = ctx.getImageData(x, y, 1, 1);
-                const [r, g, b, a] = data;
+                let pixelData: Uint8ClampedArray;
+
+                try {
+                  const { data } = ctx.getImageData(x, y, 1, 1);
+                  pixelData = data;
+                } catch (error) {
+                  // Out of bounds or other error
+                  console.error("Error getting pixel data:", error);
+                  setHoverInfo(null);
+                  return;
+                }
+
+                const [r, g, b, a] = pixelData;
 
                 if (a === 0) {
-                  setHoverInfo({ x, y, r, g: "-1", b, a, hex: "", name: "Transparent" });
+                  setHoverInfo({ x, y, r, g, b, a, hex: "", name: "Transparent" });
                   return;
                 }
 
@@ -356,8 +364,8 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
                   b,
                   a,
                   hex: rgbToHex(r, g, b),
-                  tier: paletteMatch ? paletteMatch.tier : undefined,
-                  name: paletteMatch ? paletteMatch.name : undefined,
+                  tier: paletteMatch?.tier,
+                  name: paletteMatch?.name,
                 });
 
               } else {
