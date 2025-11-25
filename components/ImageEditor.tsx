@@ -444,17 +444,16 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick, 
               <div>x: {hoverInfo.x} y: {hoverInfo.y}</div>
             </div>
           )}
-
-          <button
-            onClick={handleDownload}
-            className="absolute top-2 right-2 bg-white dark:bg-blue-600/50 hover:bg-opacity-100 text-gray-800 dark:text-gray-100 text-xs px-3 py-1 rounded-lg transition"
-          >
-            Download PNG
-          </button>
-
         </div>
 
         {/* Upload another image */}
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="w-full text-sm text-gray-500 dark:text-gray-200 cursor-pointer bg-blue-100 dark:bg-blue-900 p-2 rounded-lg hover:bg-blue-200 hover:dark:bg-blue-700 transition"
+        >
+          Download
+        </button>
         <button
           type="button"
           onClick={onUploadClick}
