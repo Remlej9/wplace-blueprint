@@ -17,6 +17,7 @@ type UsedColor = {
   hex: string;
   name?: string;
   count: number;
+  tier?: "free" | "premium";
 };
 
 type HoverInfo = {
@@ -112,7 +113,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
       const data = imageData.data;
 
       let transparentCount = 0;
-      const colorCounts = new Map<string, { name?: string; count: number }>();
+      const colorCounts = new Map<string, { name?: string; tier?: "free" | "premium"; count: number }>();
 
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
@@ -152,12 +153,12 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
         if (currentData) {
           currentData.count += 1;
         } else {
-          colorCounts.set(hex, { name: nearest.name, count: 1 });
+          colorCounts.set(hex, { name: nearest.name, tier: nearest.tier, count: 1 });
         }
       }
 
       const sortedUsedColors: UsedColor[] = Array.from(colorCounts.entries())
-        .map(([hex, { name, count }]) => ({ hex, name, count }))
+        .map(([hex, { name, tier, count }]) => ({ hex, name, tier, count }))
         .sort((a, b) => b.count - a.count);
 
       setUsedColorsData(sortedUsedColors);
@@ -408,7 +409,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
                   {hoverInfo.name ? `${hoverInfo.name} ` : ""}
                   </div>
                 ) : hoverInfo.tier === "premium" ? (
-                  <div className="inline align-middle text-yellow-600">
+                  <div className="inline align-middle text-yellow-300 dark:text-yellow-500">
                   {hoverInfo.name ? `${hoverInfo.name} ` : ""}
                   (premium)
                   </div>
@@ -539,10 +540,19 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
             {activePalette.map((color) => (
               <div
                 key={color.hex}
-                className="aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
+                className="relative aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
                 style={{ backgroundColor: color.hex }}
                 title={color.name}
-              />
+              >
+                {/* Tier indicator dot */}
+                <div
+                  className={`absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full
+                    ${color.tier === "free" 
+                      ? "" 
+                      : "bg-yellow-400 dark:bg-yellow-400"}`}
+                  title={color.tier === "premium" ? "Premium Color" : undefined}
+                ></div>
+              </div>
             ))}
           </div>
         </div>
@@ -559,10 +569,19 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
             {(colorLimit > 0 ? usedColorsData.slice(0, colorLimit) : usedColorsData).map((data) => (
               <div
                 key={data.hex}
-                className="aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
+                className="relative aspect-square h-8 rounded-lg border border-gray-300 dark:border-gray-600"
                 style={{ backgroundColor: data.hex }}
                 title={`${data.name} (${data.count} pixels)`}
-              />
+              >
+                {/* Tier indicator dot */}
+                <div
+                  className={`absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full
+                    ${data.tier === "free" 
+                      ? "" 
+                      : "bg-yellow-400 dark:bg-yellow-400"}`}
+                  title={data.tier === "premium" ? "Premium Color" : undefined}
+                ></div>
+              </div>
             ))}
           </div>
         </div>
