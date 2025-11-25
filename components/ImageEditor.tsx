@@ -32,6 +32,20 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
   const [ showGrid, setShowGrid ] = useState(true);
   const [ hoverPixel, setHoverPixel ] = useState<{ x: number; y: number } | null>(null);
 
+  type HoverInfo = {
+    x: number;
+    y: number;
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+    hex: string;
+    tier?: "free" | "premium";
+    name?: string;
+  };
+
+  const [ hoverInfo, setHoverInfo ] = useState<HoverInfo | null>(null);
+
   // Prepare color palettes
   const activePalette = useMemo(
     () =>
@@ -228,7 +242,7 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
 
   }, [ usedColorsData.length, setColorLimit ]);
 
-  {/* useEffect for grid canvas */}
+  // useEffect for grid canvas
   useEffect(() => {
     const gridCanvas = gridCanvasRef.current;
     const baseCanvas = canvasRef.current;
@@ -305,6 +319,56 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
             ref={canvasRef}
             aria-label={alt}
             className="w-full h-full [image-rendering:pixelated] [image-rendering:crisp-edges]"
+            onMouseMove={(e) => {
+              const canvas = canvasRef.current;
+              if (!canvas) return;
+
+              const rect = canvas.getBoundingClientRect();
+              const scaleX = canvas.width / rect.width;
+              const scaleY = canvas.height / rect.height;
+
+              const x = Math.floor((e.clientX - rect.left) * scaleX);
+              const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+              if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+                setHoverPixel({ x, y });
+
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return;
+
+                const { data } = ctx.getImageData(x, y, 1, 1);
+                const [r, g, b, a] = data;
+
+                if (a === 0) {
+                  setHoverInfo({ x, y, r, g: "-1", b, a, hex: "", name: "Transparent" });
+                  return;
+                }
+
+                const paletteMatch = PALETTE.find(
+                  (c) => c.hex.toLowerCase() === rgbToHex(r, g, b).toLowerCase()
+                );
+
+                setHoverInfo({
+                  x,
+                  y,
+                  r,
+                  g,
+                  b,
+                  a,
+                  hex: rgbToHex(r, g, b),
+                  tier: paletteMatch ? paletteMatch.tier : undefined,
+                  name: paletteMatch ? paletteMatch.name : undefined,
+                });
+
+              } else {
+                setHoverPixel(null);
+                setHoverInfo(null);
+              }
+            }}
+            onMouseLeave={() => {
+              setHoverPixel(null)
+              setHoverInfo(null);
+            }}
           />
 
           {/* Grid Overlay */}
@@ -319,10 +383,36 @@ export default function ImageEditor({ src, alt = "Edited Image", onUploadClick }
             {size} x {size} ({size * size} px)
           </div>
 
-
+          {/* Display pixels to paint in bottom-left corner */}
           <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
             {(size * size - transparentPixels) >= 0 ? size * size - transparentPixels : 0} pixels to paint
           </div>
+
+          {/* Hover info display in top-left corner of image */}
+          {hoverInfo && (
+            <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
+              <div>
+                <div className="inline-block w-3 h-3 mr-1 align-middle rounded-sm"
+                  style={{ backgroundColor: hoverInfo.hex }}
+                ></div>
+                {hoverInfo.tier === "free" ? (
+                  <div className="inline align-middle">
+                  {hoverInfo.name ? `${hoverInfo.name} ` : ""}
+                  </div>
+                ) : hoverInfo.tier === "premium" ? (
+                  <div className="inline align-middle text-yellow-600">
+                  {hoverInfo.name ? `${hoverInfo.name} ` : ""}
+                  (premium)
+                  </div>
+                ) : (
+                  <div className="inline align-middle">
+                  {hoverInfo.name ? `${hoverInfo.name} ` : ""}
+                  </div>
+                )}
+              </div>
+              <div>x: {hoverInfo.x} y: {hoverInfo.y}</div>
+            </div>
+          )}
 
           <button
             onClick={handleDownload}
@@ -535,5 +625,14 @@ function ControlRow({ label, value, min, max, step = 1, onChange }: ControlRowPr
         className="w-full accent-blue-500"
       />
     </div>
+  );
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return (
+    "#" +
+    [r, g, b]
+      .map((v) => v.toString(16).padStart(2, "0") )
+      .join("")
   );
 }
